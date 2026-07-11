@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -9,6 +9,7 @@ import { RepliesModule } from './modules/replies/replies.module';
 import { ConfigModule } from '@nestjs/config';
 import { AllExceptionsFilter } from './common/filter/all-exception.filter';
 import { ResponseInterceptor } from './common/interceptor/response.interceptor';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
   imports: [
@@ -30,4 +31,8 @@ import { ResponseInterceptor } from './common/interceptor/response.interceptor';
     { provide: 'APP_INTERCEPTOR', useClass: ResponseInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}
