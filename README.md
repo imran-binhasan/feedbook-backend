@@ -6,3 +6,5 @@ Current progress:
 - Boilerplate cleanup done
 - Docker compose for local Postgres & Prisma ORM setup done
 - Database schema/table writing & initial migration done
+- Common module : response interface, interceptor & response interceptor added
+- Added session, user & auth service, user creation & login dto, also added auth controller for interceptor & exception testing
