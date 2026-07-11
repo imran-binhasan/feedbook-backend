@@ -5,3 +5,4 @@ Current progress:
 - Project folder structure defined
 - Boilerplate cleanup done
 - Docker compose for local Postgres & Prisma ORM setup done
+- Database schema/table writing & initial migration done
