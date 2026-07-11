@@ -1,46 +1,28 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '../../../infrastructure/database/database-connection';
-import type { DrizzleDB } from '../../../infrastructure/database/database-connection';
-import { users } from '../../../infrastructure/database/schema';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { hashPass } from '../../../common/utils/hashpass';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { UserRepository } from '../../../infrastructure/database/repositories/user.repository';
+import { UpdateUserDto } from '../dto/update-user.dto';
+import type { UserProfile } from '../../../common/types/request.type';
 
 @Injectable()
 export class UserService {
-  constructor(
-    @Inject(DRIZZLE)
-    private readonly db: DrizzleDB,
-  ) {}
+  constructor(private readonly userRepository: UserRepository) {}
 
-  async findByEmail(email: string) {
-    const [user] = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
+  async findById(id: string): Promise<UserProfile> {
+    const user = await this.userRepository.findById(id);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
     return user;
   }
 
-  async create(dto: CreateUserDto) {
-    const passwordHash = await hashPass(dto.password);
+  async update(id: string, dto: UpdateUserDto): Promise<UserProfile> {
+    const user = await this.userRepository.update(id, dto);
 
-    const [user] = await this.db
-      .insert(users)
-      .values({
-        email: dto.email,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        passwordHash,
-      })
-      .returning({
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        createdAt: users.createdAt,
-      });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
     return user;
   }

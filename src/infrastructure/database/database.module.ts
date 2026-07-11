@@ -1,31 +1,45 @@
-import { Global, Inject, Module, OnModuleInit, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Module,
+  OnModuleDestroy,
+  OnModuleInit,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
-import { DRIZZLE } from './database-connection';
+import { DRIZZLE, PG_POOL } from './database-connection';
 import type { DrizzleDB } from './database-connection';
 
-@Global()
 @Module({
   providers: [
     {
-      provide: DRIZZLE,
+      provide: PG_POOL,
       inject: [ConfigService],
-      useFactory: (configService: ConfigService): DrizzleDB => {
-        const pool = new Pool({
+      useFactory: (configService: ConfigService): Pool => {
+        return new Pool({
           connectionString: configService.getOrThrow<string>('DATABASE_URL'),
         });
+      },
+    },
+    {
+      provide: DRIZZLE,
+      inject: [PG_POOL],
+      useFactory: (pool: Pool): DrizzleDB => {
         return drizzle(pool, { schema });
       },
     },
   ],
   exports: [DRIZZLE],
 })
-export class DatabaseModule implements OnModuleInit {
+export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseModule.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    @Inject(PG_POOL) private readonly pool: Pool,
+  ) {}
 
   async onModuleInit() {
     try {
@@ -35,5 +49,10 @@ export class DatabaseModule implements OnModuleInit {
       this.logger.error('Error connecting to the database', error);
       throw error;
     }
+  }
+
+  async onModuleDestroy() {
+    await this.pool.end();
+    this.logger.log('Database connection pool closed.');
   }
 }
