@@ -20,7 +20,8 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const swaggerDocument = () => SwaggerModule.createDocument(app, swaggerConfig);
+  const swaggerDocument = () =>
+    SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, swaggerDocument);
   app.useGlobalPipes(
     new ValidationPipe({

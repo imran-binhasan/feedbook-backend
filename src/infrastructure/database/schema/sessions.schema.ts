@@ -1,12 +1,6 @@
 import { uuidv7 } from 'uuidv7';
 import { users } from './users.schema';
-import {
-  pgTable,
-  uuid,
-  varchar,
-  timestamp,
-  index,
-} from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, index } from 'drizzle-orm/pg-core';
 
 export const sessions = pgTable(
   'sessions',

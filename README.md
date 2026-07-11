@@ -9,3 +9,6 @@ Current progress:
 - Common module : response interface, interceptor & response interceptor added
 - Added session, user & auth service, user creation & login dto, also added auth controller for interceptor & exception testing
 - Complete auth module, added access module for better architecure & communication with auth & user module, review whole codebase & fixed few issues, like we forgot to enforce env validation,was using raw drizzle import everywhere which was bad practice also few minor issues were overloooked, wrapped that & also added swagger documentation & reviewed all code quality,
+-Completed storage module & service for s3
+-Completed post module
+-Completed comment module

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from '../env.validation';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { RepositoriesModule } from './infrastructure/database/repositories/repositories.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
 import { CommonModule } from './common/common.module';
 import { AccessModule } from './modules/access/access.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -24,6 +25,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     }),
     DatabaseModule,
     RepositoriesModule,
+    StorageModule,
     CommonModule,
     AccessModule,
     AuthModule,
