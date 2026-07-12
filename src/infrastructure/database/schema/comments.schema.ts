@@ -6,7 +6,9 @@ import {
   integer,
   timestamp,
   index,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { users } from './users.schema';
 import { posts } from './posts.schema';
@@ -37,5 +39,8 @@ export const comments = pgTable(
       table.createdAt,
       table.id,
     ),
+    check('comments_content_check', sql`${table.content} IS NULL OR length(${table.content}) > 0`),
+    check('comments_like_count_check', sql`${table.likeCount} >= 0`),
+    check('comments_reply_count_check', sql`${table.replyCount} >= 0`),
   ],
 );

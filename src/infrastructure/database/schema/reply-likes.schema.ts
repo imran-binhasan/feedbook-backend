@@ -1,4 +1,4 @@
-import { pgTable, uuid, timestamp, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, timestamp, primaryKey, index } from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 import { replies } from './replies.schema';
 
@@ -15,5 +15,8 @@ export const replyLikes = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.replyId, table.userId] })],
+  (table) => [
+    primaryKey({ columns: [table.replyId, table.userId] }),
+    index('reply_likes_likers_idx').on(table.replyId, table.createdAt),
+  ],
 );

@@ -7,7 +7,9 @@ import {
   boolean,
   timestamp,
   index,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { users } from './users.schema';
 
@@ -39,5 +41,9 @@ export const posts = pgTable(
       table.id,
     ),
     index('posts_user_id_created_at_idx').on(table.userId, table.createdAt),
+    check('posts_content_check', sql`${table.content} IS NULL OR length(${table.content}) > 0`),
+    check('posts_like_count_check', sql`${table.likeCount} >= 0`),
+    check('posts_comment_count_check', sql`${table.commentCount} >= 0`),
+    check('posts_updated_at_check', sql`${table.updatedAt} >= ${table.createdAt}`),
   ],
 );
