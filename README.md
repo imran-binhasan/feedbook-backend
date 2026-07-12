@@ -14,3 +14,4 @@ Current progress:
 -Completed comment module
 -Added db-level check constraints for schema safety,index migrations, apply helmet & cors hardening for security
 -Added likes module, wired session & post caching, updated response & types
+-Added replies module with nested crud under comments, added reply repository with cursor pagination
