@@ -21,7 +21,7 @@ export const posts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     content: text('content'),
-    imageUrl: varchar('image_url', { length: 1024 }), // R2 object key, not full URL
+    imageKey: varchar('image_url', { length: 1024 }),
     likeCount: integer('like_count').notNull().default(0),
     commentCount: integer('comment_count').notNull().default(0),
     isPublic: boolean('is_public').notNull().default(true),

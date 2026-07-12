@@ -4,10 +4,10 @@ import { envValidationSchema } from '../env.validation';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { RepositoriesModule } from './infrastructure/database/repositories/repositories.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
+import { CacheModule } from './infrastructure/cache/cache.module';
 import { CommonModule } from './common/common.module';
-import { AccessModule } from './modules/access/access.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { LikesModule } from './modules/likes/likes.module';
@@ -26,10 +26,10 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     DatabaseModule,
     RepositoriesModule,
     StorageModule,
+    CacheModule,
     CommonModule,
-    AccessModule,
     AuthModule,
-    UsersModule,
+    UploadsModule,
     PostsModule,
     CommentsModule,
     LikesModule,

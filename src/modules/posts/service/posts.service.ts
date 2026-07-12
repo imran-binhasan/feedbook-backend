@@ -23,18 +23,6 @@ export class PostsService {
     private readonly storageService: StorageService,
   ) {}
 
-  async uploadImage(
-    user: CurrentUserPayload,
-    file: Express.Multer.File,
-  ): Promise<{ key: string; url: string }> {
-    const key = this.storageService.buildKey(
-      'posts',
-      user.userId,
-      file.mimetype,
-    );
-    return this.storageService.upload(key, file.buffer, file.mimetype);
-  }
-
   async create(user: CurrentUserPayload, dto: CreatePostDto) {
     if (!dto.content && !dto.imageKey) {
       throw new BadRequestException('Post must have content or an image');
@@ -43,7 +31,7 @@ export class PostsService {
     const post = await this.postRepository.create({
       userId: user.userId,
       content: dto.content ?? null,
-      imageUrl: dto.imageKey ?? null,
+      imageKey: dto.imageKey ?? null,
       isPublic: dto.isPublic ?? true,
     });
 
@@ -77,15 +65,15 @@ export class PostsService {
 
     if (
       dto.imageKey !== undefined &&
-      dto.imageKey !== post.imageUrl &&
-      post.imageUrl
+      dto.imageKey !== post.imageKey &&
+      post.imageKey
     ) {
-      this.storageService.delete(post.imageUrl).catch(() => {});
+      this.storageService.delete(post.imageKey).catch(() => {});
     }
 
     const updated = await this.postRepository.update(id, {
       content: dto.content,
-      imageUrl: dto.imageKey,
+      imageKey: dto.imageKey,
       isPublic: dto.isPublic,
     });
 
@@ -105,8 +93,8 @@ export class PostsService {
 
     await this.postRepository.delete(id);
 
-    if (post.imageUrl) {
-      await this.storageService.delete(post.imageUrl);
+    if (post.imageKey) {
+      await this.storageService.delete(post.imageKey);
     }
   }
 
@@ -148,7 +136,7 @@ export class PostsService {
       id: post.id,
       userId: post.userId,
       content: post.content,
-      imageUrl: this.storageService.getPublicUrl(post.imageUrl),
+      imageUrl: this.storageService.getPublicUrl(post.imageKey),
       likeCount: post.likeCount,
       commentCount: post.commentCount,
       isPublic: post.isPublic,
@@ -162,7 +150,7 @@ export class PostsService {
       id: post.id,
       userId: post.userId,
       content: post.content,
-      imageUrl: this.storageService.getPublicUrl(post.imageUrl),
+      imageUrl: this.storageService.getPublicUrl(post.imageKey),
       likeCount: post.likeCount,
       commentCount: post.commentCount,
       isPublic: post.isPublic,

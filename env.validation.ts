@@ -3,6 +3,10 @@ import * as Joi from 'joi';
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(4000),
   DATABASE_URL: Joi.string().required(),
+  // Optional: when unset, the cache layer degrades to a no-op and the app
+  // serves all traffic from the database. Required only for production with
+  // a Redis instance deployed alongside the backend.
+  REDIS_URL: Joi.string().uri().optional(),
   R2_ENDPOINT: Joi.string().uri().required(),
   R2_ACCESS_KEY_ID: Joi.string().required(),
   R2_SECRET_ACCESS_KEY: Joi.string().required(),

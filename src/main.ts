@@ -9,10 +9,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'log', 'warn', 'debug'],
   });
-
+  const configService = app.get(ConfigService);
   app.enableVersioning();
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors({
+    origin: configService.get<string>('FRONTEND_URL'),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Feedbook API')
@@ -31,7 +36,6 @@ async function bootstrap() {
     }),
   );
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') ?? 4000;
   await app.listen(port);
   logger.debug(`Application is running on : http://127.0.0.1:${port}/api`);

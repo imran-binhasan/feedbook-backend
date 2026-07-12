@@ -24,7 +24,7 @@ export const comments = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     content: text('content'),
-    imageUrl: varchar('image_url', { length: 1024 }),
+    imageKey: varchar('image_url', { length: 1024 }),
     likeCount: integer('like_count').notNull().default(0),
     replyCount: integer('reply_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true })

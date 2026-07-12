@@ -25,12 +25,16 @@ export class CommentsService {
     private readonly storageService: StorageService,
   ) {}
 
-  async create(user: CurrentUserPayload, dto: CreateCommentDto) {
+  async create(
+    user: CurrentUserPayload,
+    postId: string,
+    dto: CreateCommentDto,
+  ) {
     if (!dto.content && !dto.imageKey) {
       throw new BadRequestException('Comment must have content or an image');
     }
 
-    const post = await this.postRepository.findById(dto.postId);
+    const post = await this.postRepository.findById(postId);
     if (!post) {
       throw new NotFoundException('Post not found');
     }
@@ -39,13 +43,13 @@ export class CommentsService {
     }
 
     const comment = await this.commentRepository.create({
-      postId: dto.postId,
+      postId,
       userId: user.userId,
       content: dto.content ?? null,
-      imageUrl: dto.imageKey ?? null,
+      imageKey: dto.imageKey ?? null,
     });
 
-    await this.postRepository.incrementCommentCount(dto.postId);
+    await this.postRepository.adjustCommentCount(postId, 1);
 
     return this.toCommentResponse(comment);
   }
@@ -62,15 +66,15 @@ export class CommentsService {
 
     if (
       dto.imageKey !== undefined &&
-      dto.imageKey !== comment.imageUrl &&
-      comment.imageUrl
+      dto.imageKey !== comment.imageKey &&
+      comment.imageKey
     ) {
-      this.storageService.delete(comment.imageUrl).catch(() => {});
+      this.storageService.delete(comment.imageKey).catch(() => {});
     }
 
     const updated = await this.commentRepository.update(id, {
       content: dto.content,
-      imageUrl: dto.imageKey,
+      imageKey: dto.imageKey,
     });
 
     return this.toCommentResponse(updated!);
@@ -87,15 +91,15 @@ export class CommentsService {
     }
 
     await this.commentRepository.delete(id);
-    await this.postRepository.decrementCommentCount(comment.postId);
+    await this.postRepository.adjustCommentCount(comment.postId, -1);
 
-    if (comment.imageUrl) {
-      await this.storageService.delete(comment.imageUrl);
+    if (comment.imageKey) {
+      await this.storageService.delete(comment.imageKey);
     }
   }
 
   async getByPost(
-    _user: CurrentUserPayload,
+    user: CurrentUserPayload,
     postId: string,
     cursorStr?: string,
     limitStr?: string,
@@ -104,7 +108,7 @@ export class CommentsService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
-    if (!post.isPublic && post.userId !== _user.userId) {
+    if (!post.isPublic && post.userId !== user.userId) {
       throw new NotFoundException('Post not found');
     }
 
@@ -122,7 +126,7 @@ export class CommentsService {
       postId: comment.postId,
       userId: comment.userId,
       content: comment.content,
-      imageUrl: this.storageService.getPublicUrl(comment.imageUrl),
+      imageUrl: this.storageService.getPublicUrl(comment.imageKey),
       likeCount: comment.likeCount,
       replyCount: comment.replyCount,
       createdAt: comment.createdAt,
@@ -135,7 +139,7 @@ export class CommentsService {
       postId: comment.postId,
       userId: comment.userId,
       content: comment.content,
-      imageUrl: this.storageService.getPublicUrl(comment.imageUrl),
+      imageUrl: this.storageService.getPublicUrl(comment.imageKey),
       likeCount: comment.likeCount,
       replyCount: comment.replyCount,
       createdAt: comment.createdAt,

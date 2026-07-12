@@ -3,11 +3,11 @@ import {
   ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateUserDto } from '../../users/dto/create-user.dto';
+import { RegisterDto } from '../dto/register.dto';
 import { LoginDto } from '../dto/login.dto';
 import { PasswordHasher } from '../../../common/services/password-hasher.service';
 import { UserRepository } from '../../../infrastructure/database/repositories/user.repository';
-import { SessionService } from '../../access/service/session.service';
+import { SessionService } from '../service/session.service';
 import type {
   UserProfile,
   LoginResult,
@@ -21,7 +21,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
   ) {}
 
-  async register(dto: CreateUserDto): Promise<UserProfile> {
+  async register(dto: RegisterDto): Promise<UserProfile> {
     const existingUser = await this.userRepository.findByEmail(dto.email);
 
     if (existingUser) {

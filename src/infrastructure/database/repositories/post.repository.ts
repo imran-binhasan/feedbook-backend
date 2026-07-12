@@ -7,13 +7,13 @@ import { posts, users } from '../schema';
 export interface CreatePostRecord {
   userId: string;
   content?: string | null;
-  imageUrl?: string | null;
+  imageKey?: string | null;
   isPublic?: boolean | null;
 }
 
 export interface UpdatePostRecord {
   content?: string | null;
-  imageUrl?: string | null;
+  imageKey?: string | null;
   isPublic?: boolean | null;
 }
 
@@ -21,7 +21,7 @@ export interface PostRow {
   id: string;
   userId: string;
   content: string | null;
-  imageUrl: string | null;
+  imageKey: string | null;
   likeCount: number;
   commentCount: number;
   isPublic: boolean;
@@ -63,20 +63,20 @@ export class PostRepository {
         id: posts.id,
         userId: posts.userId,
         content: posts.content,
-        imageUrl: posts.imageUrl,
-        likeCount: posts.likeCount,
-        commentCount: posts.commentCount,
-        isPublic: posts.isPublic,
-        createdAt: posts.createdAt,
-        updatedAt: posts.updatedAt,
-        authorId: users.id,
-        authorFirstName: users.firstName,
-        authorLastName: users.lastName,
-      })
-      .from(posts)
-      .innerJoin(users, eq(posts.userId, users.id))
-      .where(eq(posts.id, id))
-      .limit(1);
+imageKey: posts.imageKey,
+      likeCount: posts.likeCount,
+      commentCount: posts.commentCount,
+      isPublic: posts.isPublic,
+      createdAt: posts.createdAt,
+      updatedAt: posts.updatedAt,
+      authorId: users.id,
+      authorFirstName: users.firstName,
+      authorLastName: users.lastName,
+    })
+    .from(posts)
+    .innerJoin(users, eq(posts.userId, users.id))
+    .where(eq(posts.id, id))
+    .limit(1);
 
     return row ?? null;
   }
@@ -87,7 +87,7 @@ export class PostRepository {
       .values({
         userId: data.userId,
         content: data.content ?? null,
-        imageUrl: data.imageUrl ?? null,
+        imageKey: data.imageKey ?? null,
         isPublic: data.isPublic ?? true,
       })
       .returning();
@@ -101,8 +101,8 @@ export class PostRepository {
     if (data.content !== undefined) {
       setValues.content = data.content;
     }
-    if (data.imageUrl !== undefined) {
-      setValues.imageUrl = data.imageUrl;
+    if (data.imageKey !== undefined) {
+      setValues.imageKey = data.imageKey;
     }
     if (data.isPublic !== undefined) {
       setValues.isPublic = data.isPublic;
@@ -117,17 +117,17 @@ export class PostRepository {
     return row ?? null;
   }
 
-  async incrementCommentCount(id: string): Promise<void> {
+  async adjustCommentCount(id: string, delta: 1 | -1): Promise<void> {
     await this.db
       .update(posts)
-      .set({ commentCount: sql`${posts.commentCount} + 1` })
+      .set({ commentCount: sql`GREATEST(${posts.commentCount} + ${delta}, 0)` })
       .where(eq(posts.id, id));
   }
 
-  async decrementCommentCount(id: string): Promise<void> {
+  async adjustLikeCount(id: string, delta: 1 | -1): Promise<void> {
     await this.db
       .update(posts)
-      .set({ commentCount: sql`${posts.commentCount} - 1` })
+      .set({ likeCount: sql`GREATEST(${posts.likeCount} + ${delta}, 0)` })
       .where(eq(posts.id, id));
   }
 
@@ -155,7 +155,7 @@ export class PostRepository {
         id: posts.id,
         userId: posts.userId,
         content: posts.content,
-        imageUrl: posts.imageUrl,
+        imageKey: posts.imageKey,
         likeCount: posts.likeCount,
         commentCount: posts.commentCount,
         isPublic: posts.isPublic,
@@ -207,7 +207,7 @@ export class PostRepository {
         id: posts.id,
         userId: posts.userId,
         content: posts.content,
-        imageUrl: posts.imageUrl,
+        imageKey: posts.imageKey,
         likeCount: posts.likeCount,
         commentCount: posts.commentCount,
         isPublic: posts.isPublic,

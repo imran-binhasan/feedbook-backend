@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, lt, or, and, desc, type SQL } from 'drizzle-orm';
+import { eq, lt, or, and, desc, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { comments, users } from '../schema';
@@ -8,12 +8,12 @@ export interface CreateCommentRecord {
   postId: string;
   userId: string;
   content?: string | null;
-  imageUrl?: string | null;
+  imageKey?: string | null;
 }
 
 export interface UpdateCommentRecord {
   content?: string | null;
-  imageUrl?: string | null;
+  imageKey?: string | null;
 }
 
 export interface CommentRow {
@@ -21,7 +21,7 @@ export interface CommentRow {
   postId: string;
   userId: string;
   content: string | null;
-  imageUrl: string | null;
+  imageKey: string | null;
   likeCount: number;
   replyCount: number;
   createdAt: Date;
@@ -62,7 +62,7 @@ export class CommentRepository {
         postId: data.postId,
         userId: data.userId,
         content: data.content ?? null,
-        imageUrl: data.imageUrl ?? null,
+        imageKey: data.imageKey ?? null,
       })
       .returning();
 
@@ -78,8 +78,8 @@ export class CommentRepository {
     if (data.content !== undefined) {
       setValues.content = data.content;
     }
-    if (data.imageUrl !== undefined) {
-      setValues.imageUrl = data.imageUrl;
+    if (data.imageKey !== undefined) {
+      setValues.imageKey = data.imageKey;
     }
 
     if (Object.keys(setValues).length === 0) {
@@ -97,6 +97,20 @@ export class CommentRepository {
 
   async delete(id: string): Promise<void> {
     await this.db.delete(comments).where(eq(comments.id, id));
+  }
+
+  async adjustLikeCount(id: string, delta: 1 | -1): Promise<void> {
+    await this.db
+      .update(comments)
+      .set({ likeCount: sql`GREATEST(${comments.likeCount} + ${delta}, 0)` })
+      .where(eq(comments.id, id));
+  }
+
+  async adjustReplyCount(id: string, delta: 1 | -1): Promise<void> {
+    await this.db
+      .update(comments)
+      .set({ replyCount: sql`GREATEST(${comments.replyCount} + ${delta}, 0)` })
+      .where(eq(comments.id, id));
   }
 
   async getByPost(
@@ -124,7 +138,7 @@ export class CommentRepository {
         postId: comments.postId,
         userId: comments.userId,
         content: comments.content,
-        imageUrl: comments.imageUrl,
+        imageKey: comments.imageKey,
         likeCount: comments.likeCount,
         replyCount: comments.replyCount,
         createdAt: comments.createdAt,
