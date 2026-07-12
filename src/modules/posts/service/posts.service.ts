@@ -11,16 +11,20 @@ import type {
   CursorValue,
 } from '../../../infrastructure/database/repositories/post.repository';
 import { StorageService } from '../../../infrastructure/storage/storage.service';
+import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { CreatePostDto } from '../dto/create-post.dto';
 import { UpdatePostDto } from '../dto/update-post.dto';
 import type { CurrentUserPayload } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
+
+const POST_CACHE_TTL = 300;
 
 @Injectable()
 export class PostsService {
   constructor(
     private readonly postRepository: PostRepository,
     private readonly storageService: StorageService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async create(user: CurrentUserPayload, dto: CreatePostDto) {
@@ -39,6 +43,11 @@ export class PostsService {
   }
 
   async findById(user: CurrentUserPayload, id: string) {
+    const cacheKey = `post:${id}`;
+
+    const cached = await this.cacheService.get<ReturnType<typeof this.toFeedItemResponse>>(cacheKey);
+    if (cached) return cached;
+
     const post = await this.postRepository.findByIdWithAuthor(id);
 
     if (!post) {
@@ -49,7 +58,10 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    return this.toFeedItemResponse(post);
+    const response = this.toFeedItemResponse(post);
+    await this.cacheService.set(cacheKey, response, POST_CACHE_TTL);
+
+    return response;
   }
 
   async update(user: CurrentUserPayload, id: string, dto: UpdatePostDto) {
@@ -77,6 +89,8 @@ export class PostsService {
       isPublic: dto.isPublic,
     });
 
+    await this.cacheService.del(`post:${id}`);
+
     return this.toPostResponse(updated!);
   }
 
@@ -96,6 +110,8 @@ export class PostsService {
     if (post.imageKey) {
       await this.storageService.delete(post.imageKey);
     }
+
+    await this.cacheService.del(`post:${id}`);
   }
 
   async getFeed(
@@ -211,7 +227,7 @@ export class PostsService {
     return {
       items,
       nextCursor:
-        items.length > 0 ? this.encodeCursor(rows[rows.length - 1]) : null,
+        hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
       hasMore,
     };
   }

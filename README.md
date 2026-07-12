@@ -12,3 +12,5 @@ Current progress:
 -Completed storage module & service for s3
 -Completed post module
 -Completed comment module
+-Added db-level check constraints for schema safety,index migrations, apply helmet & cors hardening for security
+-Added likes module, wired session & post caching, updated response & types

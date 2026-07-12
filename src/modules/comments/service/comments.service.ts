@@ -196,7 +196,7 @@ export class CommentsService {
     return {
       items,
       nextCursor:
-        items.length > 0 ? this.encodeCursor(rows[rows.length - 1]) : null,
+        hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
       hasMore,
     };
   }

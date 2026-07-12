@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -22,7 +23,7 @@ export class UserPostsController {
   @ApiOperation({ summary: 'Get paginated posts authored by a user' })
   async getUserPosts(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {

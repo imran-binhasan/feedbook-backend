@@ -1,6 +1,7 @@
 import {
   CallHandler,
   ExecutionContext,
+  HttpStatus,
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
@@ -21,16 +22,21 @@ function isCursorPaginated<T>(data: unknown): data is CursorPaginatedResult<T> {
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<
   T | CursorPaginatedResult<T>,
-  ApiSuccessResponse<T | T[]>
+  ApiSuccessResponse<T | T[]> | void
 > {
   intercept(
     context: ExecutionContext,
     next: CallHandler<T | CursorPaginatedResult<T>>,
-  ): Observable<ApiSuccessResponse<T | T[]>> {
-    const request = context.switchToHttp().getRequest();
+  ): Observable<ApiSuccessResponse<T | T[]> | void> {
+    const response = context.switchToHttp().getResponse();
 
     return next.handle().pipe(
       map((result) => {
+        if (response.statusCode === HttpStatus.NO_CONTENT) {
+          return undefined;
+        }
+
+        const request = context.switchToHttp().getRequest();
         const timestamp = new Date().toISOString();
 
         if (isCursorPaginated<T>(result)) {

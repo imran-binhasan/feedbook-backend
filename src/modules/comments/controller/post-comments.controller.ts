@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Body,
   Query,
@@ -25,7 +26,7 @@ export class PostCommentsController {
   @ApiOperation({ summary: 'Create a comment on a post' })
   async create(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('postId') postId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
     @Body() dto: CreateCommentDto,
   ) {
     return this.commentsService.create(user, postId, dto);
@@ -35,7 +36,7 @@ export class PostCommentsController {
   @ApiOperation({ summary: 'Get paginated comments for a post' })
   async getByPost(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('postId') postId: string,
+    @Param('postId', ParseUUIDPipe) postId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {

@@ -1,4 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from '../env.validation';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -27,6 +29,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     RepositoriesModule,
     StorageModule,
     CacheModule,
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     CommonModule,
     AuthModule,
     UploadsModule,
@@ -39,6 +42,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
   providers: [
     { provide: 'APP_FILTER', useClass: AllExceptionsFilter },
     { provide: 'APP_INTERCEPTOR', useClass: ResponseInterceptor },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule implements NestModule {

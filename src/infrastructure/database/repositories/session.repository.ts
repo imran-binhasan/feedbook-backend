@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { createHash } from 'crypto';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { sessions } from '../schema';
+import { hashToken } from '../../../common/utils/crypto.util';
 import type {
   SessionInfo,
   SessionPayload,
@@ -22,12 +22,8 @@ export class SessionRepository {
     private readonly db: DrizzleDB,
   ) {}
 
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token, 'utf8').digest('hex');
-  }
-
   async create(data: CreateSessionRecord): Promise<SessionInfo> {
-    const tokenHash = this.hashToken(data.token);
+    const tokenHash = hashToken(data.token);
 
     const [session] = await this.db
       .insert(sessions)
@@ -54,7 +50,7 @@ export class SessionRepository {
         expiresAt: sessions.expiresAt,
       })
       .from(sessions)
-      .where(eq(sessions.tokenHash, this.hashToken(token)))
+      .where(eq(sessions.tokenHash, hashToken(token)))
       .limit(1);
 
     if (!session) {
@@ -71,6 +67,6 @@ export class SessionRepository {
   async deleteByToken(token: string): Promise<void> {
     await this.db
       .delete(sessions)
-      .where(eq(sessions.tokenHash, this.hashToken(token)));
+      .where(eq(sessions.tokenHash, hashToken(token)));
   }
 }

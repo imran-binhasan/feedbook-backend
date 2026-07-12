@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   UseGuards,
 } from '@nestjs/common';
@@ -26,7 +27,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Update a comment' })
   async update(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateCommentDto,
   ) {
     return this.commentsService.update(user, id, dto);
@@ -37,7 +38,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Delete a comment' })
   async remove(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.commentsService.remove(user, id);
   }

@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -50,7 +51,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Get a post by ID' })
   async findById(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.postsService.findById(user, id);
   }
@@ -59,7 +60,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Update a post' })
   async update(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePostDto,
   ) {
     return this.postsService.update(user, id, dto);
@@ -70,7 +71,7 @@ export class PostsController {
   @ApiOperation({ summary: 'Delete a post' })
   async remove(
     @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     await this.postsService.remove(user, id);
   }
