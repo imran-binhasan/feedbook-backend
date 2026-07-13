@@ -21,7 +21,7 @@ export class AuthService {
     private readonly sessionService: SessionService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<UserProfile> {
+  async register(dto: RegisterDto): Promise<LoginResult> {
     const existingUser = await this.userRepository.findByEmail(dto.email);
 
     if (existingUser) {
@@ -29,13 +29,24 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordHasher.hash(dto.password);
-
-    return this.userRepository.create({
+    const user = await this.userRepository.create({
       email: dto.email,
       firstName: dto.firstName,
       lastName: dto.lastName,
       passwordHash,
     });
+
+    const session = await this.sessionService.create(user.id);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      session,
+    };
   }
 
   async login(dto: LoginDto): Promise<LoginResult> {

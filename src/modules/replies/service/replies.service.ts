@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ReplyRepository } from '../../../infrastructure/database/repositories/reply.repository';
 import { CommentRepository } from '../../../infrastructure/database/repositories/comment.repository';
+import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
 import { CreateReplyDto } from '../dto/create-reply.dto';
 import { UpdateReplyDto } from '../dto/update-reply.dto';
 import type {
@@ -19,6 +20,7 @@ export class RepliesService {
   constructor(
     private readonly replyRepository: ReplyRepository,
     private readonly commentRepository: CommentRepository,
+    private readonly likeRepository: LikeRepository,
   ) {}
 
   async create(
@@ -70,6 +72,7 @@ export class RepliesService {
   }
 
   async getByComment(
+    user: CurrentUserPayload,
     commentId: string,
     cursor?: string,
     limit?: string,
@@ -89,7 +92,13 @@ export class RepliesService {
       parsedLimit,
     );
 
-    return this.paginate(rows, parsedLimit);
+    const result = this.paginate(rows, parsedLimit);
+    const replyIds = result.items.map((r) => r.id);
+    const likedIds = await this.likeRepository.getUserLikedReplyIds(user.userId, replyIds);
+    return {
+      ...result,
+      items: result.items.map((r) => ({ ...r, hasLiked: likedIds.has(r.id) })),
+    };
   }
 
   private toResponse(reply: ReplyRow): ReplyResponse {
@@ -127,14 +136,15 @@ export class RepliesService {
 
   private encodeCursor(value: { createdAt: Date; id: string }): string {
     return Buffer.from(
-      JSON.stringify({ createdAt: value.createdAt, id: value.id }),
+      JSON.stringify({ createdAt: value.createdAt.toISOString(), id: value.id }),
     ).toString('base64url');
   }
 
   private decodeCursor(
     cursor: string,
   ): { createdAt: Date; id: string } {
-    return JSON.parse(Buffer.from(cursor, 'base64url').toString());
+    const raw = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+    return { createdAt: new Date(raw.createdAt), id: raw.id };
   }
 
   private paginate(

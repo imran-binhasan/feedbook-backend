@@ -99,6 +99,7 @@ export class ReplyRepository {
     cursor: CursorValue | null,
     limit: number,
   ): Promise<ReplyWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions: (SQL | undefined)[] = [eq(replies.commentId, commentId)];
 
     if (cursor) {

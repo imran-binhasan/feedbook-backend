@@ -113,11 +113,22 @@ export class CommentRepository {
       .where(eq(comments.id, id));
   }
 
+  async findCommentImageKeysByPost(postId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ imageKey: comments.imageKey })
+      .from(comments)
+      .where(
+        and(eq(comments.postId, postId), sql`${comments.imageKey} IS NOT NULL`),
+      );
+    return rows.map((r) => r.imageKey).filter(Boolean) as string[];
+  }
+
   async getByPost(
     postId: string,
     cursor: CursorValue | null,
     limit: number,
   ): Promise<CommentWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions: (SQL | undefined)[] = [eq(comments.postId, postId)];
 
     if (cursor) {

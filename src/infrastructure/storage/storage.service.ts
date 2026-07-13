@@ -46,6 +46,7 @@ export class StorageService {
         Key: key,
         Body: buffer,
         ContentType: contentType,
+
       }),
     );
 

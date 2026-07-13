@@ -9,6 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../service/auth.service';
 import { SessionService } from '../service/session.service';
@@ -24,6 +25,7 @@ import type {
 } from '../../../common/types/request.type';
 
 @ApiTags('Auth')
+@UseGuards(ThrottlerGuard)
 @Controller({ version: '1' })
 export class AuthController {
   constructor(
@@ -33,12 +35,14 @@ export class AuthController {
   ) {}
 
   @Post('auth/register')
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
   @ApiOperation({ summary: 'Sign up for a new account' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
   @Post('auth/login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in and receive a session token' })
   async login(@Body() dto: LoginDto) {

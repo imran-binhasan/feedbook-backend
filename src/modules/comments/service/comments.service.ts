@@ -11,6 +11,7 @@ import type {
   CursorValue,
 } from '../../../infrastructure/database/repositories/comment.repository';
 import { PostRepository } from '../../../infrastructure/database/repositories/post.repository';
+import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
 import { StorageService } from '../../../infrastructure/storage/storage.service';
 import { CreateCommentDto } from '../dto/create-comment.dto';
 import { UpdateCommentDto } from '../dto/update-comment.dto';
@@ -22,6 +23,7 @@ export class CommentsService {
   constructor(
     private readonly commentRepository: CommentRepository,
     private readonly postRepository: PostRepository,
+    private readonly likeRepository: LikeRepository,
     private readonly storageService: StorageService,
   ) {}
 
@@ -116,8 +118,14 @@ export class CommentsService {
     const cursor = this.decodeCursor(cursorStr);
 
     const rows = await this.commentRepository.getByPost(postId, cursor, limit);
+    const result = this.paginate(rows, limit);
 
-    return this.paginate(rows, limit);
+    const commentIds = result.items.map((c) => c.id);
+    const likedIds = await this.likeRepository.getUserLikedCommentIds(user.userId, commentIds);
+    return {
+      ...result,
+      items: result.items.map((c) => ({ ...c, hasLiked: likedIds.has(c.id) })),
+    };
   }
 
   private toCommentResponse(comment: CommentRow) {

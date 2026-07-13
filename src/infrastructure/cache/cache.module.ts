@@ -45,7 +45,7 @@ import { REDIS_CLIENT } from './cache.constants';
     },
     CacheService,
   ],
-  exports: [CacheService],
+  exports: [CacheService, REDIS_CLIENT],
 })
 export class CacheModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CacheModule.name);

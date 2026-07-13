@@ -1,12 +1,13 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from '../env.validation';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { RepositoriesModule } from './infrastructure/database/repositories/repositories.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { CacheModule } from './infrastructure/cache/cache.module';
+import { REDIS_CLIENT } from './infrastructure/cache/cache.constants';
+import { RedisThrottlerStorage } from './infrastructure/cache/redis-throttler.storage';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
@@ -17,6 +18,7 @@ import { RepliesModule } from './modules/replies/replies.module';
 import { AllExceptionsFilter } from './common/filter/all-exception.filter';
 import { ResponseInterceptor } from './common/interceptor/response.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import type Redis from 'ioredis';
 
 @Module({
   imports: [
@@ -29,7 +31,18 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
     RepositoriesModule,
     StorageModule,
     CacheModule,
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRootAsync({
+      inject: [REDIS_CLIENT, ConfigService],
+      useFactory: (redis: Redis | null, config: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: config.get<number>('THROTTLE_TTL') ?? 60000,
+            limit: config.get<number>('THROTTLE_LIMIT') ?? 100,
+          },
+        ],
+        storage: new RedisThrottlerStorage(redis),
+      }),
+    }),
     CommonModule,
     AuthModule,
     UploadsModule,
@@ -42,7 +55,6 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
   providers: [
     { provide: 'APP_FILTER', useClass: AllExceptionsFilter },
     { provide: 'APP_INTERCEPTOR', useClass: ResponseInterceptor },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule implements NestModule {

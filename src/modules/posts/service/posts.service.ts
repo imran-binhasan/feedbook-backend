@@ -10,6 +10,8 @@ import type {
   PostWithAuthorRow,
   CursorValue,
 } from '../../../infrastructure/database/repositories/post.repository';
+import { CommentRepository } from '../../../infrastructure/database/repositories/comment.repository';
+import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
 import { StorageService } from '../../../infrastructure/storage/storage.service';
 import { CacheService } from '../../../infrastructure/cache/cache.service';
 import { CreatePostDto } from '../dto/create-post.dto';
@@ -23,6 +25,8 @@ const POST_CACHE_TTL = 300;
 export class PostsService {
   constructor(
     private readonly postRepository: PostRepository,
+    private readonly commentRepository: CommentRepository,
+    private readonly likeRepository: LikeRepository,
     private readonly storageService: StorageService,
     private readonly cacheService: CacheService,
   ) {}
@@ -89,7 +93,7 @@ export class PostsService {
       isPublic: dto.isPublic,
     });
 
-    await this.cacheService.del(`post:${id}`);
+    this.cacheService.del(`post:${id}`).catch(() => {});
 
     return this.toPostResponse(updated!);
   }
@@ -105,17 +109,20 @@ export class PostsService {
       throw new ForbiddenException('You do not own this post');
     }
 
+    const commentImageKeys = await this.commentRepository.findCommentImageKeysByPost(id);
+    const allImageKeys = [post.imageKey, ...commentImageKeys].filter(Boolean) as string[];
+
     await this.postRepository.delete(id);
 
-    if (post.imageKey) {
-      await this.storageService.delete(post.imageKey);
+    for (const key of allImageKeys) {
+      this.storageService.delete(key).catch(() => {});
     }
 
-    await this.cacheService.del(`post:${id}`);
+    this.cacheService.del(`post:${id}`).catch(() => {});
   }
 
   async getFeed(
-    _user: CurrentUserPayload,
+    user: CurrentUserPayload,
     cursorStr?: string,
     limitStr?: string,
   ) {
@@ -124,7 +131,19 @@ export class PostsService {
 
     const rows = await this.postRepository.getFeed(cursor, limit);
 
-    return this.paginate(rows, limit);
+    return this.enrichWithLikes(user.userId, this.paginate(rows, limit));
+  }
+
+  private async enrichWithLikes(
+    userId: string,
+    result: CursorPaginatedResult<ReturnType<typeof this.toFeedItemResponse>>,
+  ) {
+    const postIds = result.items.map((p) => p.id);
+    const likedIds = await this.likeRepository.getUserLikedPostIds(userId, postIds);
+    return {
+      ...result,
+      items: result.items.map((p) => ({ ...p, hasLiked: likedIds.has(p.id) })),
+    };
   }
 
   async getUserPosts(

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, or, desc, lt } from 'drizzle-orm';
+import { eq, and, or, desc, lt, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { postLikes, commentLikes, replyLikes, users } from '../schema';
@@ -29,23 +29,22 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [existing] = await this.db
-      .select()
-      .from(postLikes)
-      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)))
-      .limit(1);
+    const [inserted] = await this.db
+      .insert(postLikes)
+      .values({ postId, userId })
+      .onConflictDoNothing()
+      .returning();
 
-    if (existing) {
-      await this.db
-        .delete(postLikes)
-        .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
-      await adjustCounter(-1);
-      return { liked: false };
+    if (inserted) {
+      await adjustCounter(1);
+      return { liked: true };
     }
 
-    await this.db.insert(postLikes).values({ postId, userId });
-    await adjustCounter(1);
-    return { liked: true };
+    await this.db
+      .delete(postLikes)
+      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+    await adjustCounter(-1);
+    return { liked: false };
   }
 
   async toggleComment(
@@ -53,30 +52,27 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [existing] = await this.db
-      .select()
-      .from(commentLikes)
-      .where(
-        and(eq(commentLikes.commentId, commentId), eq(commentLikes.userId, userId)),
-      )
-      .limit(1);
+    const [inserted] = await this.db
+      .insert(commentLikes)
+      .values({ commentId, userId })
+      .onConflictDoNothing()
+      .returning();
 
-    if (existing) {
-      await this.db
-        .delete(commentLikes)
-        .where(
-          and(
-            eq(commentLikes.commentId, commentId),
-            eq(commentLikes.userId, userId),
-          ),
-        );
-      await adjustCounter(-1);
-      return { liked: false };
+    if (inserted) {
+      await adjustCounter(1);
+      return { liked: true };
     }
 
-    await this.db.insert(commentLikes).values({ commentId, userId });
-    await adjustCounter(1);
-    return { liked: true };
+    await this.db
+      .delete(commentLikes)
+      .where(
+        and(
+          eq(commentLikes.commentId, commentId),
+          eq(commentLikes.userId, userId),
+        ),
+      );
+    await adjustCounter(-1);
+    return { liked: false };
   }
 
   async toggleReply(
@@ -84,30 +80,75 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [existing] = await this.db
-      .select()
-      .from(replyLikes)
-      .where(
-        and(eq(replyLikes.replyId, replyId), eq(replyLikes.userId, userId)),
-      )
-      .limit(1);
+    const [inserted] = await this.db
+      .insert(replyLikes)
+      .values({ replyId, userId })
+      .onConflictDoNothing()
+      .returning();
 
-    if (existing) {
-      await this.db
-        .delete(replyLikes)
-        .where(
-          and(
-            eq(replyLikes.replyId, replyId),
-            eq(replyLikes.userId, userId),
-          ),
-        );
-      await adjustCounter(-1);
-      return { liked: false };
+    if (inserted) {
+      await adjustCounter(1);
+      return { liked: true };
     }
 
-    await this.db.insert(replyLikes).values({ replyId, userId });
-    await adjustCounter(1);
-    return { liked: true };
+    await this.db
+      .delete(replyLikes)
+      .where(
+        and(eq(replyLikes.replyId, replyId), eq(replyLikes.userId, userId)),
+      );
+    await adjustCounter(-1);
+    return { liked: false };
+  }
+
+  async getUserLikedPostIds(
+    userId: string,
+    postIds: string[],
+  ): Promise<Set<string>> {
+    if (postIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ postId: postLikes.postId })
+      .from(postLikes)
+      .where(
+        and(
+          eq(postLikes.userId, userId),
+          inArray(postLikes.postId, postIds),
+        ),
+      );
+    return new Set(rows.map((r) => r.postId));
+  }
+
+  async getUserLikedCommentIds(
+    userId: string,
+    commentIds: string[],
+  ): Promise<Set<string>> {
+    if (commentIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ commentId: commentLikes.commentId })
+      .from(commentLikes)
+      .where(
+        and(
+          eq(commentLikes.userId, userId),
+          inArray(commentLikes.commentId, commentIds),
+        ),
+      );
+    return new Set(rows.map((r) => r.commentId));
+  }
+
+  async getUserLikedReplyIds(
+    userId: string,
+    replyIds: string[],
+  ): Promise<Set<string>> {
+    if (replyIds.length === 0) return new Set();
+    const rows = await this.db
+      .select({ replyId: replyLikes.replyId })
+      .from(replyLikes)
+      .where(
+        and(
+          eq(replyLikes.userId, userId),
+          inArray(replyLikes.replyId, replyIds),
+        ),
+      );
+    return new Set(rows.map((r) => r.replyId));
   }
 
   async getPostLikers(
@@ -115,6 +156,7 @@ export class LikeRepository {
     cursor: CursorValue | null,
     limit: number,
   ): Promise<LikeWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions = [eq(postLikes.postId, postId)];
     if (cursor) {
       conditions.push(
@@ -148,6 +190,7 @@ export class LikeRepository {
     cursor: CursorValue | null,
     limit: number,
   ): Promise<LikeWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions = [eq(commentLikes.commentId, commentId)];
     if (cursor) {
       conditions.push(
@@ -181,6 +224,7 @@ export class LikeRepository {
     cursor: CursorValue | null,
     limit: number,
   ): Promise<LikeWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions = [eq(replyLikes.replyId, replyId)];
     if (cursor) {
       conditions.push(

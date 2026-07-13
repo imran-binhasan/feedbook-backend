@@ -35,10 +35,11 @@ export class PostCommentRepliesController {
   @Get(':postId/comments/:commentId/replies')
   @ApiOperation({ summary: 'Get paginated replies for a comment' })
   async getByComment(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('commentId', ParseUUIDPipe) commentId: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.repliesService.getByComment(commentId, cursor, limit);
+    return this.repliesService.getByComment(user, commentId, cursor, limit);
   }
 }

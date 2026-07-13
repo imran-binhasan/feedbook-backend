@@ -20,6 +20,7 @@ import type { DrizzleDB } from './database-connection';
       useFactory: (configService: ConfigService): Pool => {
         return new Pool({
           connectionString: configService.getOrThrow<string>('DATABASE_URL'),
+          max: configService.get<number>('DATABASE_POOL_SIZE') ?? 20,
         });
       },
     },

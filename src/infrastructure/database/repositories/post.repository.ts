@@ -150,6 +150,7 @@ imageKey: posts.imageKey,
     cursor: CursorValue | null,
     limit: number,
   ): Promise<PostWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const rows = await this.db
       .select({
         id: posts.id,
@@ -188,6 +189,7 @@ imageKey: posts.imageKey,
     limit: number,
     includePrivate: boolean,
   ): Promise<PostWithAuthorRow[]> {
+    limit = Math.min(limit, 100);
     const conditions = [eq(posts.userId, userId)];
 
     if (!includePrivate) {

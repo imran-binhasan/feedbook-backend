@@ -3,6 +3,7 @@ import * as Joi from 'joi';
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(4000),
   DATABASE_URL: Joi.string().required(),
+  DATABASE_POOL_SIZE: Joi.number().min(1).max(200).default(20),
   FRONTEND_URL: Joi.string().uri().optional(),
   REDIS_URL: Joi.string().uri().optional(),
   R2_ENDPOINT: Joi.string().uri().required(),
