@@ -163,7 +163,7 @@ export class PostsService {
       includePrivate,
     );
 
-    return this.paginate(rows, limit);
+    return this.enrichWithLikes(user.userId, this.paginate(rows, limit));
   }
 
   private toPostResponse(post: PostRow) {

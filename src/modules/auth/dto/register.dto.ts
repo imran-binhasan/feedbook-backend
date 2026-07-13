@@ -21,9 +21,9 @@ export class RegisterDto {
   @MaxLength(100)
   lastName!: string;
 
-  @ApiProperty({ example: 'secret123', minLength: 6, maxLength: 30 })
+  @ApiProperty({ example: 'secret123', minLength: 8, maxLength: 64 })
   @IsString()
-  @MinLength(6)
-  @MaxLength(30)
+  @MinLength(8)
+  @MaxLength(64)
   password!: string;
 }
