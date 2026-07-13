@@ -8,7 +8,6 @@ import { PostRepository } from '../../../infrastructure/database/repositories/po
 import type {
   PostRow,
   PostWithAuthorRow,
-  CursorValue,
 } from '../../../infrastructure/database/repositories/post.repository';
 import { CommentRepository } from '../../../infrastructure/database/repositories/comment.repository';
 import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
@@ -18,8 +17,14 @@ import { CreatePostDto } from '../dto/create-post.dto';
 import { UpdatePostDto } from '../dto/update-post.dto';
 import type { CurrentUserPayload } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
+import {
+  decodeCursor,
+  parseLimit,
+  paginate,
+} from '../../../common/utils/cursor-pagination.util';
 
 const POST_CACHE_TTL = 300;
+const TOP_LIKERS_PER_POST = 3;
 
 @Injectable()
 export class PostsService {
@@ -62,7 +67,19 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    const response = this.toFeedItemResponse(post);
+    const [likedIds, topLikersByPost] = await Promise.all([
+      this.likeRepository.getUserLikedPostIds(user.userId, [post.id]),
+      this.likeRepository.getTopLikersForPosts([post.id], TOP_LIKERS_PER_POST),
+    ]);
+
+    const response = {
+      ...this.toFeedItemResponse(post),
+      hasLiked: likedIds.has(post.id),
+      likers: (topLikersByPost.get(post.id) ?? []).map((l) => ({
+        userId: l.userId,
+        author: { id: l.userId, firstName: l.authorFirstName, lastName: l.authorLastName },
+      })),
+    };
     await this.cacheService.set(cacheKey, response, POST_CACHE_TTL);
 
     return response;
@@ -126,12 +143,12 @@ export class PostsService {
     cursorStr?: string,
     limitStr?: string,
   ) {
-    const limit = this.parseLimit(limitStr);
-    const cursor = this.decodeCursor(cursorStr);
+    const limit = parseLimit(limitStr);
+    const cursor = decodeCursor(cursorStr);
 
     const rows = await this.postRepository.getFeed(cursor, limit);
 
-    return this.enrichWithLikes(user.userId, this.paginate(rows, limit));
+    return this.enrichWithLikes(user.userId, paginate(rows, limit));
   }
 
   private async enrichWithLikes(
@@ -139,10 +156,24 @@ export class PostsService {
     result: CursorPaginatedResult<ReturnType<typeof this.toFeedItemResponse>>,
   ) {
     const postIds = result.items.map((p) => p.id);
-    const likedIds = await this.likeRepository.getUserLikedPostIds(userId, postIds);
+    const [likedIds, topLikersByPost] = await Promise.all([
+      this.likeRepository.getUserLikedPostIds(userId, postIds),
+      this.likeRepository.getTopLikersForPosts(postIds, TOP_LIKERS_PER_POST),
+    ]);
     return {
       ...result,
-      items: result.items.map((p) => ({ ...p, hasLiked: likedIds.has(p.id) })),
+      items: result.items.map((p) => ({
+        ...p,
+        hasLiked: likedIds.has(p.id),
+        likers: (topLikersByPost.get(p.id) ?? []).map((l) => ({
+          userId: l.userId,
+          author: {
+            id: l.userId,
+            firstName: l.authorFirstName,
+            lastName: l.authorLastName,
+          },
+        })),
+      })),
     };
   }
 
@@ -152,8 +183,8 @@ export class PostsService {
     cursorStr?: string,
     limitStr?: string,
   ) {
-    const limit = this.parseLimit(limitStr);
-    const cursor = this.decodeCursor(cursorStr);
+    const limit = parseLimit(limitStr);
+    const cursor = decodeCursor(cursorStr);
     const includePrivate = targetUserId === user.userId;
 
     const rows = await this.postRepository.getAuthorPosts(
@@ -163,7 +194,7 @@ export class PostsService {
       includePrivate,
     );
 
-    return this.enrichWithLikes(user.userId, this.paginate(rows, limit));
+    return this.enrichWithLikes(user.userId, paginate(rows, limit));
   }
 
   private toPostResponse(post: PostRow) {
@@ -196,58 +227,6 @@ export class PostsService {
         firstName: post.authorFirstName,
         lastName: post.authorLastName,
       },
-    };
-  }
-
-  private parseLimit(limitStr?: string): number {
-    if (!limitStr) return 10;
-    const n = parseInt(limitStr, 10);
-    if (isNaN(n) || n < 1) return 10;
-    return Math.min(n, 50);
-  }
-
-  private decodeCursor(s?: string): CursorValue | null {
-    if (!s) return null;
-    let raw: Record<string, unknown>;
-    try {
-      raw = JSON.parse(Buffer.from(s, 'base64url').toString('utf8')) as Record<
-        string,
-        unknown
-      >;
-    } catch {
-      throw new BadRequestException('Invalid cursor');
-    }
-    if (typeof raw.createdAt === 'string' && typeof raw.id === 'string') {
-      return { createdAt: new Date(raw.createdAt), id: raw.id };
-    }
-    throw new BadRequestException('Invalid cursor');
-  }
-
-  private encodeCursor(item: { createdAt: Date; id: string }): string {
-    return Buffer.from(
-      JSON.stringify({
-        createdAt: item.createdAt.toISOString(),
-        id: item.id,
-      }),
-    ).toString('base64url');
-  }
-
-  private paginate<T extends { createdAt: Date; id: string }>(
-    rows: T[],
-    limit: number,
-  ): CursorPaginatedResult<ReturnType<typeof this.toFeedItemResponse>> {
-    const hasMore = rows.length > limit;
-    if (hasMore) rows.pop();
-
-    const items = rows.map((r) =>
-      this.toFeedItemResponse(r as unknown as PostWithAuthorRow),
-    );
-
-    return {
-      items,
-      nextCursor:
-        hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
-      hasMore,
     };
   }
 }

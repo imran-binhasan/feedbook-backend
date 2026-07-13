@@ -18,5 +18,6 @@ export const commentLikes = pgTable(
   (table) => [
     primaryKey({ columns: [table.commentId, table.userId] }),
     index('comment_likes_likers_idx').on(table.commentId, table.createdAt),
+    index('comment_likes_user_idx').on(table.userId),
   ],
 );

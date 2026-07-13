@@ -11,6 +11,8 @@ interface ThrottlerStorageRecord {
 
 @Injectable()
 export class RedisThrottlerStorage implements ThrottlerStorage {
+  private readonly fallback = new Map<string, { totalHits: number; expiresAt: number; blockUntil: number }>();
+
   constructor(private readonly redis: Redis | null) {}
 
   async increment(
@@ -21,7 +23,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     _throttlerName: string,
   ): Promise<ThrottlerStorageRecord> {
     if (!this.redis) {
-      return { totalHits: 1, timeToExpire: ttl, isBlocked: false, timeToBlockExpire: 0 };
+      return this.fallbackIncrement(key, ttl, limit, blockDuration);
     }
 
     const blockKey = `${key}:block`;
@@ -43,5 +45,33 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     }
 
     return { totalHits, timeToExpire, isBlocked: false, timeToBlockExpire: 0 };
+  }
+
+  private fallbackIncrement(
+    key: string,
+    ttl: number,
+    limit: number,
+    blockDuration: number,
+  ): ThrottlerStorageRecord {
+    const now = Date.now();
+    const entry = this.fallback.get(key);
+
+    if (entry && entry.blockUntil > now) {
+      return { totalHits: limit + 1, timeToExpire: ttl, isBlocked: true, timeToBlockExpire: entry.blockUntil - now };
+    }
+
+    if (!entry || entry.expiresAt <= now) {
+      this.fallback.set(key, { totalHits: 1, expiresAt: now + ttl, blockUntil: 0 });
+      return { totalHits: 1, timeToExpire: ttl, isBlocked: false, timeToBlockExpire: 0 };
+    }
+
+    entry.totalHits += 1;
+
+    if (entry.totalHits > limit && blockDuration > 0) {
+      entry.blockUntil = now + blockDuration;
+      return { totalHits: entry.totalHits, timeToExpire: entry.expiresAt - now, isBlocked: true, timeToBlockExpire: blockDuration };
+    }
+
+    return { totalHits: entry.totalHits, timeToExpire: entry.expiresAt - now, isBlocked: false, timeToBlockExpire: 0 };
   }
 }

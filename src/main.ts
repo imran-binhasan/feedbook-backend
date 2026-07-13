@@ -41,7 +41,13 @@ async function bootstrap() {
     }),
   );
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'same-origin' },
+      crossOriginEmbedderPolicy: false,
+      contentSecurityPolicy: false,
+    }),
+  );
   app.enableShutdownHooks();
 
   const port = configService.get<number>('PORT') ?? 4000;

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, or, desc, lt, inArray } from 'drizzle-orm';
+import { eq, and, or, desc, lt, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { postLikes, commentLikes, replyLikes, users } from '../schema';
@@ -29,22 +29,24 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [inserted] = await this.db
-      .insert(postLikes)
-      .values({ postId, userId })
-      .onConflictDoNothing()
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(postLikes)
+        .values({ postId, userId })
+        .onConflictDoNothing()
+        .returning();
 
-    if (inserted) {
-      await adjustCounter(1);
-      return { liked: true };
-    }
+      if (inserted) {
+        await adjustCounter(1);
+        return { liked: true };
+      }
 
-    await this.db
-      .delete(postLikes)
-      .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
-    await adjustCounter(-1);
-    return { liked: false };
+      await tx
+        .delete(postLikes)
+        .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)));
+      await adjustCounter(-1);
+      return { liked: false };
+    });
   }
 
   async toggleComment(
@@ -52,27 +54,29 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [inserted] = await this.db
-      .insert(commentLikes)
-      .values({ commentId, userId })
-      .onConflictDoNothing()
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(commentLikes)
+        .values({ commentId, userId })
+        .onConflictDoNothing()
+        .returning();
 
-    if (inserted) {
-      await adjustCounter(1);
-      return { liked: true };
-    }
+      if (inserted) {
+        await adjustCounter(1);
+        return { liked: true };
+      }
 
-    await this.db
-      .delete(commentLikes)
-      .where(
-        and(
-          eq(commentLikes.commentId, commentId),
-          eq(commentLikes.userId, userId),
-        ),
-      );
-    await adjustCounter(-1);
-    return { liked: false };
+      await tx
+        .delete(commentLikes)
+        .where(
+          and(
+            eq(commentLikes.commentId, commentId),
+            eq(commentLikes.userId, userId),
+          ),
+        );
+      await adjustCounter(-1);
+      return { liked: false };
+    });
   }
 
   async toggleReply(
@@ -80,24 +84,26 @@ export class LikeRepository {
     userId: string,
     adjustCounter: (delta: 1 | -1) => Promise<void>,
   ): Promise<{ liked: boolean }> {
-    const [inserted] = await this.db
-      .insert(replyLikes)
-      .values({ replyId, userId })
-      .onConflictDoNothing()
-      .returning();
+    return this.db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(replyLikes)
+        .values({ replyId, userId })
+        .onConflictDoNothing()
+        .returning();
 
-    if (inserted) {
-      await adjustCounter(1);
-      return { liked: true };
-    }
+      if (inserted) {
+        await adjustCounter(1);
+        return { liked: true };
+      }
 
-    await this.db
-      .delete(replyLikes)
-      .where(
-        and(eq(replyLikes.replyId, replyId), eq(replyLikes.userId, userId)),
-      );
-    await adjustCounter(-1);
-    return { liked: false };
+      await tx
+        .delete(replyLikes)
+        .where(
+          and(eq(replyLikes.replyId, replyId), eq(replyLikes.userId, userId)),
+        );
+      await adjustCounter(-1);
+      return { liked: false };
+    });
   }
 
   async getUserLikedPostIds(
@@ -149,6 +155,55 @@ export class LikeRepository {
         ),
       );
     return new Set(rows.map((r) => r.replyId));
+  }
+
+  async getTopLikersForPosts(
+    postIds: string[],
+    topN: number,
+  ): Promise<Map<string, LikeWithAuthorRow[]>> {
+    const result = new Map<string, LikeWithAuthorRow[]>();
+    if (postIds.length === 0) return result;
+
+    const rankCol = sql<number>`ROW_NUMBER() OVER (PARTITION BY ${postLikes.postId} ORDER BY ${postLikes.createdAt} DESC)`.as('rn');
+
+    const rows = await this.db
+      .select({
+        userId: postLikes.userId,
+        postId: postLikes.postId,
+        createdAt: postLikes.createdAt,
+        authorId: users.id,
+        authorFirstName: users.firstName,
+        authorLastName: users.lastName,
+      })
+      .from(
+        this.db
+          .select({
+            userId: postLikes.userId,
+            postId: postLikes.postId,
+            createdAt: postLikes.createdAt,
+            rn: rankCol,
+          })
+          .from(postLikes)
+          .where(inArray(postLikes.postId, postIds))
+          .as('ranked'),
+      )
+      .innerJoin(users, eq(sql`"ranked".user_id`, users.id))
+      .where(sql`"ranked".rn <= ${topN}`)
+      .orderBy(desc(sql`"ranked".created_at`));
+
+    for (const row of rows) {
+      const list = result.get(row.postId) ?? [];
+      list.push({
+        userId: row.userId,
+        createdAt: row.createdAt,
+        authorId: row.authorId,
+        authorFirstName: row.authorFirstName,
+        authorLastName: row.authorLastName,
+      });
+      result.set(row.postId, list);
+    }
+
+    return result;
   }
 
   async getPostLikers(

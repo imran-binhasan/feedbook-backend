@@ -35,11 +35,12 @@ export class LikesController {
   @Get('posts/:id/likes')
   @ApiOperation({ summary: 'Get users who liked a post' })
   async getPostLikers(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.likesService.getPostLikers(id, cursor, limit);
+    return this.likesService.getPostLikers(user, id, cursor, limit);
   }
 
   @Post('comments/:id/like')
@@ -55,11 +56,12 @@ export class LikesController {
   @Get('comments/:id/likes')
   @ApiOperation({ summary: 'Get users who liked a comment' })
   async getCommentLikers(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.likesService.getCommentLikers(id, cursor, limit);
+    return this.likesService.getCommentLikers(user, id, cursor, limit);
   }
 
   @Post('replies/:id/like')
@@ -75,10 +77,11 @@ export class LikesController {
   @Get('replies/:id/likes')
   @ApiOperation({ summary: 'Get users who liked a reply' })
   async getReplyLikers(
+    @CurrentUser() user: CurrentUserPayload,
     @Param('id', ParseUUIDPipe) id: string,
     @Query('cursor') cursor?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.likesService.getReplyLikers(id, cursor, limit);
+    return this.likesService.getReplyLikers(user, id, cursor, limit);
   }
 }

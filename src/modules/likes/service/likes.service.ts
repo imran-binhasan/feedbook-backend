@@ -21,6 +21,9 @@ export class LikesService {
   ): Promise<{ liked: boolean }> {
     const post = await this.postRepository.findById(postId);
     if (!post) throw new NotFoundException('Post not found');
+    if (!post.isPublic && post.userId !== user.userId) {
+      throw new NotFoundException('Post not found');
+    }
 
     return this.likeRepository.togglePost(
       postId,
@@ -36,6 +39,11 @@ export class LikesService {
     const comment = await this.commentRepository.findById(commentId);
     if (!comment) throw new NotFoundException('Comment not found');
 
+    const post = await this.postRepository.findById(comment.postId);
+    if (!post || (!post.isPublic && post.userId !== user.userId)) {
+      throw new NotFoundException('Comment not found');
+    }
+
     return this.likeRepository.toggleComment(
       commentId,
       user.userId,
@@ -50,6 +58,14 @@ export class LikesService {
     const reply = await this.replyRepository.findById(replyId);
     if (!reply) throw new NotFoundException('Reply not found');
 
+    const comment = await this.commentRepository.findById(reply.commentId);
+    if (!comment) throw new NotFoundException('Reply not found');
+
+    const post = await this.postRepository.findById(comment.postId);
+    if (!post || (!post.isPublic && post.userId !== user.userId)) {
+      throw new NotFoundException('Reply not found');
+    }
+
     return this.likeRepository.toggleReply(
       replyId,
       user.userId,
@@ -58,12 +74,16 @@ export class LikesService {
   }
 
   async getPostLikers(
+    user: CurrentUserPayload,
     postId: string,
     cursor?: string,
     limit?: string,
   ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
     const post = await this.postRepository.findById(postId);
     if (!post) throw new NotFoundException('Post not found');
+    if (!post.isPublic && post.userId !== user.userId) {
+      throw new NotFoundException('Post not found');
+    }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
     const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
@@ -74,12 +94,18 @@ export class LikesService {
   }
 
   async getCommentLikers(
+    user: CurrentUserPayload,
     commentId: string,
     cursor?: string,
     limit?: string,
   ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
     const comment = await this.commentRepository.findById(commentId);
     if (!comment) throw new NotFoundException('Comment not found');
+
+    const post = await this.postRepository.findById(comment.postId);
+    if (!post || (!post.isPublic && post.userId !== user.userId)) {
+      throw new NotFoundException('Comment not found');
+    }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
     const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
@@ -90,12 +116,21 @@ export class LikesService {
   }
 
   async getReplyLikers(
+    user: CurrentUserPayload,
     replyId: string,
     cursor?: string,
     limit?: string,
   ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
     const reply = await this.replyRepository.findById(replyId);
     if (!reply) throw new NotFoundException('Reply not found');
+
+    const comment = await this.commentRepository.findById(reply.commentId);
+    if (!comment) throw new NotFoundException('Reply not found');
+
+    const post = await this.postRepository.findById(comment.postId);
+    if (!post || (!post.isPublic && post.userId !== user.userId)) {
+      throw new NotFoundException('Reply not found');
+    }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
     const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
