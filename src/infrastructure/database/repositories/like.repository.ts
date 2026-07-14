@@ -164,29 +164,39 @@ export class LikeRepository {
     const result = new Map<string, LikeWithAuthorRow[]>();
     if (postIds.length === 0) return result;
 
-    const batches = await Promise.all(
-      postIds.map((postId) =>
-        this.db
-          .select({
-            userId: postLikes.userId,
-            postId: postLikes.postId,
-            createdAt: postLikes.createdAt,
-            authorId: users.id,
-            authorFirstName: users.firstName,
-            authorLastName: users.lastName,
-          })
-          .from(postLikes)
-          .innerJoin(users, eq(postLikes.userId, users.id))
-          .where(eq(postLikes.postId, postId))
-          .orderBy(desc(postLikes.createdAt))
-          .limit(topN),
-      ),
+    const ranked = this.db.$with('ranked').as(
+      this.db
+        .select({
+          userId: postLikes.userId,
+          postId: postLikes.postId,
+          createdAt: postLikes.createdAt,
+          authorId: users.id,
+          authorFirstName: users.firstName,
+          authorLastName: users.lastName,
+          rn: sql<number>`ROW_NUMBER() OVER (PARTITION BY ${postLikes.postId} ORDER BY ${postLikes.createdAt} DESC)`.as('rn'),
+        })
+        .from(postLikes)
+        .innerJoin(users, eq(postLikes.userId, users.id))
+        .where(inArray(postLikes.postId, postIds)),
     );
 
-    for (let i = 0; i < postIds.length; i++) {
-      if (batches[i].length > 0) {
-        result.set(postIds[i], batches[i]);
-      }
+    const rows = await this.db
+      .with(ranked)
+      .select({
+        userId: ranked.userId,
+        postId: ranked.postId,
+        createdAt: ranked.createdAt,
+        authorId: ranked.authorId,
+        authorFirstName: ranked.authorFirstName,
+        authorLastName: ranked.authorLastName,
+      })
+      .from(ranked)
+      .where(sql`${ranked.rn} <= ${topN}`);
+
+    for (const row of rows) {
+      const list = result.get(row.postId) ?? [];
+      list.push(row);
+      result.set(row.postId, list);
     }
 
     return result;
