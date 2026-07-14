@@ -29,6 +29,13 @@
       "when": 1783838744588,
       "tag": "0003_public_betty_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783997777465,
+      "tag": "0004_zippy_hex",
+      "breakpoints": true
     }
   ]
 }

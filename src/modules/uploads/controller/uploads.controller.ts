@@ -1,12 +1,11 @@
 import {
   BadRequestException,
-  Body,
   Controller,
   Post,
+  Req,
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  ParseEnumPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -20,6 +19,7 @@ import { AuthGuard } from '../../auth/guard/auth.guard';
 import { CurrentUser } from '../../../common/decorator/current-user.decorator';
 import { UploadsService } from '../service/uploads.service';
 import type { CurrentUserPayload } from '../../../common/types/request.type';
+import type { Request } from 'express';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -60,9 +60,14 @@ export class UploadsController {
   @ApiOperation({ summary: 'Upload an image and receive key + URL' })
   async uploadImage(
     @CurrentUser() user: CurrentUserPayload,
-    @Body('folder', new ParseEnumPipe({ enum: ['posts', 'comments', 'replies'] })) folder: 'posts' | 'comments' | 'replies',
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
   ) {
-    return this.uploadsService.uploadImage(user, file, folder);
+    const folder = (req.body as Record<string, unknown>).folder;
+    const allowed = ['posts', 'comments', 'replies'];
+    if (typeof folder !== 'string' || !allowed.includes(folder)) {
+      throw new BadRequestException(`folder must be one of: ${allowed.join(', ')}`);
+    }
+    return this.uploadsService.uploadImage(user, file, folder as 'posts' | 'comments' | 'replies');
   }
 }

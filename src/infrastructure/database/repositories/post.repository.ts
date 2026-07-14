@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, lt, or, and, desc, sql } from 'drizzle-orm';
+import { eq, and, or, desc, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { posts, users } from '../schema';
@@ -140,17 +140,19 @@ imageKey: posts.imageKey,
     cursor: CursorValue | null,
   ) {
     if (!cursor) return undefined;
-    return or(
-      lt(field.createdAt, cursor.createdAt),
-      and(eq(field.createdAt, cursor.createdAt), lt(field.id, cursor.id)),
-    );
+    return sql`(${field.createdAt}, ${field.id}) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`;
   }
 
   async getFeed(
     cursor: CursorValue | null,
     limit: number,
+    currentUserId?: string,
   ): Promise<PostWithAuthorRow[]> {
     limit = Math.min(limit, 100);
+    const visibilityCondition = currentUserId
+      ? or(eq(posts.isPublic, true), eq(posts.userId, currentUserId))
+      : eq(posts.isPublic, true);
+
     const rows = await this.db
       .select({
         id: posts.id,
@@ -170,7 +172,7 @@ imageKey: posts.imageKey,
       .innerJoin(users, eq(posts.userId, users.id))
       .where(
         and(
-          eq(posts.isPublic, true),
+          visibilityCondition,
           this.cursorWhere(
             { createdAt: posts.createdAt, id: posts.id },
             cursor,

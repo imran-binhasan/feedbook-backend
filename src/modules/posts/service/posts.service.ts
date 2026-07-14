@@ -24,7 +24,7 @@ import {
 } from '../../../common/utils/cursor-pagination.util';
 
 const POST_CACHE_TTL = 300;
-const TOP_LIKERS_PER_POST = 3;
+const TOP_LIKERS_PER_POST = 5;
 
 @Injectable()
 export class PostsService {
@@ -146,7 +146,7 @@ export class PostsService {
     const limit = parseLimit(limitStr);
     const cursor = decodeCursor(cursorStr);
 
-    const rows = await this.postRepository.getFeed(cursor, limit);
+    const rows = await this.postRepository.getFeed(cursor, limit, user.userId);
     const items = rows.map((r) => this.toFeedItemResponse(r));
 
     return this.enrichWithLikes(user.userId, paginate(items, limit));

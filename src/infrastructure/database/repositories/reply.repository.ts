@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, lt, or, and, desc, sql, type SQL } from 'drizzle-orm';
+import { eq, and, desc, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { replies, users } from '../schema';
@@ -104,13 +104,7 @@ export class ReplyRepository {
 
     if (cursor) {
       conditions.push(
-        or(
-          lt(replies.createdAt, cursor.createdAt),
-          and(
-            eq(replies.createdAt, cursor.createdAt),
-            lt(replies.id, cursor.id),
-          ),
-        ),
+        sql`(${replies.createdAt}, ${replies.id}) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`,
       );
     }
 

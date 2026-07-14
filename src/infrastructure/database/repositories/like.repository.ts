@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, and, or, desc, lt, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../database-connection';
 import type { DrizzleDB } from '../database-connection';
 import { postLikes, commentLikes, replyLikes, users } from '../schema';
@@ -164,43 +164,29 @@ export class LikeRepository {
     const result = new Map<string, LikeWithAuthorRow[]>();
     if (postIds.length === 0) return result;
 
-    const rankCol = sql<number>`ROW_NUMBER() OVER (PARTITION BY ${postLikes.postId} ORDER BY ${postLikes.createdAt} DESC)`.as('rn');
-
-    const rows = await this.db
-      .select({
-        userId: postLikes.userId,
-        postId: postLikes.postId,
-        createdAt: postLikes.createdAt,
-        authorId: users.id,
-        authorFirstName: users.firstName,
-        authorLastName: users.lastName,
-      })
-      .from(
+    const batches = await Promise.all(
+      postIds.map((postId) =>
         this.db
           .select({
             userId: postLikes.userId,
             postId: postLikes.postId,
             createdAt: postLikes.createdAt,
-            rn: rankCol,
+            authorId: users.id,
+            authorFirstName: users.firstName,
+            authorLastName: users.lastName,
           })
           .from(postLikes)
-          .where(inArray(postLikes.postId, postIds))
-          .as('ranked'),
-      )
-      .innerJoin(users, eq(sql`"ranked".user_id`, users.id))
-      .where(sql`"ranked".rn <= ${topN}`)
-      .orderBy(desc(sql`"ranked".created_at`));
+          .innerJoin(users, eq(postLikes.userId, users.id))
+          .where(eq(postLikes.postId, postId))
+          .orderBy(desc(postLikes.createdAt))
+          .limit(topN),
+      ),
+    );
 
-    for (const row of rows) {
-      const list = result.get(row.postId) ?? [];
-      list.push({
-        userId: row.userId,
-        createdAt: row.createdAt,
-        authorId: row.authorId,
-        authorFirstName: row.authorFirstName,
-        authorLastName: row.authorLastName,
-      });
-      result.set(row.postId, list);
+    for (let i = 0; i < postIds.length; i++) {
+      if (batches[i].length > 0) {
+        result.set(postIds[i], batches[i]);
+      }
     }
 
     return result;
@@ -215,13 +201,7 @@ export class LikeRepository {
     const conditions = [eq(postLikes.postId, postId)];
     if (cursor) {
       conditions.push(
-        or(
-          lt(postLikes.createdAt, cursor.createdAt),
-          and(
-            eq(postLikes.createdAt, cursor.createdAt),
-            lt(postLikes.userId, cursor.userId),
-          )!,
-        )!,
+        sql`(${postLikes.createdAt}, ${postLikes.userId}) < (${cursor.createdAt}::timestamptz, ${cursor.userId}::uuid)`,
       );
     }
 
@@ -249,13 +229,7 @@ export class LikeRepository {
     const conditions = [eq(commentLikes.commentId, commentId)];
     if (cursor) {
       conditions.push(
-        or(
-          lt(commentLikes.createdAt, cursor.createdAt),
-          and(
-            eq(commentLikes.createdAt, cursor.createdAt),
-            lt(commentLikes.userId, cursor.userId),
-          )!,
-        )!,
+        sql`(${commentLikes.createdAt}, ${commentLikes.userId}) < (${cursor.createdAt}::timestamptz, ${cursor.userId}::uuid)`,
       );
     }
 
@@ -283,13 +257,7 @@ export class LikeRepository {
     const conditions = [eq(replyLikes.replyId, replyId)];
     if (cursor) {
       conditions.push(
-        or(
-          lt(replyLikes.createdAt, cursor.createdAt),
-          and(
-            eq(replyLikes.createdAt, cursor.createdAt),
-            lt(replyLikes.userId, cursor.userId),
-          )!,
-        )!,
+        sql`(${replyLikes.createdAt}, ${replyLikes.userId}) < (${cursor.createdAt}::timestamptz, ${cursor.userId}::uuid)`,
       );
     }
 
