@@ -120,7 +120,7 @@ export class CommentRepository {
       .where(
         and(eq(comments.postId, postId), sql`${comments.imageKey} IS NOT NULL`),
       );
-    return rows.map((r) => r.imageKey).filter(Boolean) as string[];
+    return rows.map((r) => r.imageKey as string);
   }
 
   async getByPost(

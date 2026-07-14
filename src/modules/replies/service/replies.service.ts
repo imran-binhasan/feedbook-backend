@@ -10,7 +10,6 @@ import { CreateReplyDto } from '../dto/create-reply.dto';
 import { UpdateReplyDto } from '../dto/update-reply.dto';
 import type {
   CurrentUserPayload,
-  UserProfile,
 } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
 import type { ReplyRow } from '../../../infrastructure/database/repositories/reply.repository';

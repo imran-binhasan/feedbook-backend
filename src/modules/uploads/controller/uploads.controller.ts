@@ -6,6 +6,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  ParseEnumPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -59,7 +60,7 @@ export class UploadsController {
   @ApiOperation({ summary: 'Upload an image and receive key + URL' })
   async uploadImage(
     @CurrentUser() user: CurrentUserPayload,
-    @Body('folder') folder: 'posts' | 'comments' | 'replies',
+    @Body('folder', new ParseEnumPipe({ enum: ['posts', 'comments', 'replies'] })) folder: 'posts' | 'comments' | 'replies',
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.uploadsService.uploadImage(user, file, folder);

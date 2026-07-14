@@ -96,7 +96,7 @@ export class CommentsService {
     await this.postRepository.adjustCommentCount(comment.postId, -1);
 
     if (comment.imageKey) {
-      await this.storageService.delete(comment.imageKey);
+      this.storageService.delete(comment.imageKey).catch(() => {});
     }
   }
 

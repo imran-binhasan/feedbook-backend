@@ -147,8 +147,9 @@ export class PostsService {
     const cursor = decodeCursor(cursorStr);
 
     const rows = await this.postRepository.getFeed(cursor, limit);
+    const items = rows.map((r) => this.toFeedItemResponse(r));
 
-    return this.enrichWithLikes(user.userId, paginate(rows, limit));
+    return this.enrichWithLikes(user.userId, paginate(items, limit));
   }
 
   private async enrichWithLikes(
@@ -193,8 +194,9 @@ export class PostsService {
       limit,
       includePrivate,
     );
+    const items = rows.map((r) => this.toFeedItemResponse(r));
 
-    return this.enrichWithLikes(user.userId, paginate(rows, limit));
+    return this.enrichWithLikes(user.userId, paginate(items, limit));
   }
 
   private toPostResponse(post: PostRow) {

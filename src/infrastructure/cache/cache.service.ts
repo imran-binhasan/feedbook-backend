@@ -58,30 +58,6 @@ export class CacheService {
     }
   }
 
-  async delByPrefix(prefix: string): Promise<void> {
-    if (!this.client) return;
-    try {
-      let cursor = '0';
-      do {
-        const [nextCursor, keys] = await this.client.scan(
-          cursor,
-          'MATCH',
-          `${prefix}*`,
-          'COUNT',
-          200,
-        );
-        cursor = nextCursor;
-        if (keys.length > 0) {
-          await this.client.del(...keys);
-        }
-      } while (cursor !== '0');
-    } catch (err) {
-      this.logger.warn(
-        `cache.delByPrefix failed for "${prefix}": ${(err as Error).message}`,
-      );
-    }
-  }
-
   isAvailable(): boolean {
     return this.client !== null && this.client.status === 'ready';
   }
