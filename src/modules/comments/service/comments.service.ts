@@ -8,7 +8,6 @@ import { CommentRepository } from '../../../infrastructure/database/repositories
 import type {
   CommentRow,
   CommentWithAuthorRow,
-  CursorValue,
 } from '../../../infrastructure/database/repositories/comment.repository';
 import { PostRepository } from '../../../infrastructure/database/repositories/post.repository';
 import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
@@ -17,6 +16,11 @@ import { CreateCommentDto } from '../dto/create-comment.dto';
 import { UpdateCommentDto } from '../dto/update-comment.dto';
 import type { CurrentUserPayload } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
+import {
+  decodeCursor,
+  encodeCursor,
+  parseLimit,
+} from '../../../common/utils/cursor-pagination.util';
 
 @Injectable()
 export class CommentsService {
@@ -114,14 +118,17 @@ export class CommentsService {
       throw new NotFoundException('Post not found');
     }
 
-    const limit = this.parseLimit(limitStr);
-    const cursor = this.decodeCursor(cursorStr);
+    const limit = parseLimit(limitStr);
+    const cursor = decodeCursor(cursorStr);
 
     const rows = await this.commentRepository.getByPost(postId, cursor, limit);
     const result = this.paginate(rows, limit);
 
     const commentIds = result.items.map((c) => c.id);
-    const likedIds = await this.likeRepository.getUserLikedCommentIds(user.userId, commentIds);
+    const likedIds = await this.likeRepository.getUserLikedCommentIds(
+      user.userId,
+      commentIds,
+    );
     return {
       ...result,
       items: result.items.map((c) => ({ ...c, hasLiked: likedIds.has(c.id) })),
@@ -159,39 +166,6 @@ export class CommentsService {
     };
   }
 
-  private parseLimit(limitStr?: string): number {
-    if (!limitStr) return 10;
-    const n = parseInt(limitStr, 10);
-    if (isNaN(n) || n < 1) return 10;
-    return Math.min(n, 50);
-  }
-
-  private decodeCursor(s?: string): CursorValue | null {
-    if (!s) return null;
-    let raw: Record<string, unknown>;
-    try {
-      raw = JSON.parse(Buffer.from(s, 'base64url').toString('utf8')) as Record<
-        string,
-        unknown
-      >;
-    } catch {
-      throw new BadRequestException('Invalid cursor');
-    }
-    if (typeof raw.createdAt === 'string' && typeof raw.id === 'string') {
-      return { createdAt: new Date(raw.createdAt), id: raw.id };
-    }
-    throw new BadRequestException('Invalid cursor');
-  }
-
-  private encodeCursor(item: { createdAt: Date; id: string }): string {
-    return Buffer.from(
-      JSON.stringify({
-        createdAt: item.createdAt.toISOString(),
-        id: item.id,
-      }),
-    ).toString('base64url');
-  }
-
   private paginate(
     rows: CommentWithAuthorRow[],
     limit: number,
@@ -203,8 +177,7 @@ export class CommentsService {
 
     return {
       items,
-      nextCursor:
-        hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
+      nextCursor: hasMore ? encodeCursor(rows[rows.length - 1]) : null,
       hasMore,
     };
   }

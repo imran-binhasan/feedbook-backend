@@ -12,12 +12,12 @@ export function encodeCursor(item: { createdAt: Date; id: string }): string {
   ).toString('base64url');
 }
 
-export function decodeCursor(
-  s: string | undefined,
-): CursorValue | null {
+export function decodeCursor(s: string | undefined): CursorValue | null {
   if (!s) return null;
   try {
-    const raw = JSON.parse(Buffer.from(s, 'base64url').toString('utf8')) as Record<string, unknown>;
+    const raw = JSON.parse(
+      Buffer.from(s, 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
     if (typeof raw.createdAt === 'string' && typeof raw.id === 'string') {
       return { createdAt: new Date(raw.createdAt), id: raw.id };
     }
@@ -51,4 +51,36 @@ export function paginate<T extends { createdAt: Date; id: string }>(
     nextCursor: hasMore ? encodeCursor(rows[rows.length - 1]) : null,
     hasMore,
   };
+}
+
+export function encodeLikeCursor(value: {
+  createdAt: Date;
+  userId: string;
+}): string {
+  return Buffer.from(
+    JSON.stringify({
+      createdAt: value.createdAt.toISOString(),
+      userId: value.userId,
+    }),
+  ).toString('base64url');
+}
+
+export function decodeLikeCursor(
+  s: string | undefined,
+): { createdAt: Date; userId: string } | null {
+  if (!s) return null;
+  try {
+    const raw = JSON.parse(
+      Buffer.from(s, 'base64url').toString('utf8'),
+    ) as Record<string, unknown>;
+    if (typeof raw.createdAt === 'string' && typeof raw.userId === 'string') {
+      return {
+        createdAt: new Date(raw.createdAt),
+        userId: raw.userId,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

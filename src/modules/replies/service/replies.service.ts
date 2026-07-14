@@ -8,11 +8,14 @@ import { CommentRepository } from '../../../infrastructure/database/repositories
 import { LikeRepository } from '../../../infrastructure/database/repositories/like.repository';
 import { CreateReplyDto } from '../dto/create-reply.dto';
 import { UpdateReplyDto } from '../dto/update-reply.dto';
-import type {
-  CurrentUserPayload,
-} from '../../../common/types/request.type';
+import type { CurrentUserPayload } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
 import type { ReplyRow } from '../../../infrastructure/database/repositories/reply.repository';
+import {
+  decodeCursor,
+  paginate,
+  parseLimit,
+} from '../../../common/utils/cursor-pagination.util';
 
 @Injectable()
 export class RepliesService {
@@ -79,11 +82,8 @@ export class RepliesService {
     const comment = await this.commentRepository.findById(commentId);
     if (!comment) throw new NotFoundException('Comment not found');
 
-    const parsedLimit = Math.min(
-      Math.max(parseInt(limit ?? '20', 10) || 20, 1),
-      100,
-    );
-    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+    const parsedLimit = parseLimit(limit);
+    const parsedCursor = decodeCursor(cursor);
 
     const rows = await this.replyRepository.getByComment(
       commentId,
@@ -91,9 +91,13 @@ export class RepliesService {
       parsedLimit,
     );
 
-    const result = this.paginate(rows, parsedLimit);
+    const items = rows.map((r) => this.toAuthorResponse(r));
+    const result = paginate(items, parsedLimit);
     const replyIds = result.items.map((r) => r.id);
-    const likedIds = await this.likeRepository.getUserLikedReplyIds(user.userId, replyIds);
+    const likedIds = await this.likeRepository.getUserLikedReplyIds(
+      user.userId,
+      replyIds,
+    );
     return {
       ...result,
       items: result.items.map((r) => ({ ...r, hasLiked: likedIds.has(r.id) })),
@@ -130,39 +134,6 @@ export class RepliesService {
         firstName: reply.authorFirstName,
         lastName: reply.authorLastName,
       },
-    };
-  }
-
-  private encodeCursor(value: { createdAt: Date; id: string }): string {
-    return Buffer.from(
-      JSON.stringify({ createdAt: value.createdAt.toISOString(), id: value.id }),
-    ).toString('base64url');
-  }
-
-  private decodeCursor(
-    cursor: string,
-  ): { createdAt: Date; id: string } {
-    const raw = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    return { createdAt: new Date(raw.createdAt), id: raw.id };
-  }
-
-  private paginate(
-    rows: (ReplyRow & {
-      authorId: string;
-      authorFirstName: string;
-      authorLastName: string;
-    })[],
-    limit: number,
-  ): CursorPaginatedResult<ReplyResponseWithAuthor> {
-    const hasMore = rows.length > limit;
-    if (hasMore) rows.pop();
-
-    const items = rows.map((r) => this.toAuthorResponse(r));
-
-    return {
-      items,
-      nextCursor: hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
-      hasMore,
     };
   }
 }

@@ -5,6 +5,11 @@ import { CommentRepository } from '../../../infrastructure/database/repositories
 import { ReplyRepository } from '../../../infrastructure/database/repositories/reply.repository';
 import type { CurrentUserPayload } from '../../../common/types/request.type';
 import type { CursorPaginatedResult } from '../../../common/interface/api-response.interface';
+import {
+  decodeLikeCursor,
+  encodeLikeCursor,
+  parseLimit,
+} from '../../../common/utils/cursor-pagination.util';
 
 @Injectable()
 export class LikesService {
@@ -25,10 +30,8 @@ export class LikesService {
       throw new NotFoundException('Post not found');
     }
 
-    return this.likeRepository.togglePost(
-      postId,
-      user.userId,
-      (delta) => this.postRepository.adjustLikeCount(postId, delta),
+    return this.likeRepository.togglePost(postId, user.userId, (delta) =>
+      this.postRepository.adjustLikeCount(postId, delta),
     );
   }
 
@@ -44,10 +47,8 @@ export class LikesService {
       throw new NotFoundException('Comment not found');
     }
 
-    return this.likeRepository.toggleComment(
-      commentId,
-      user.userId,
-      (delta) => this.commentRepository.adjustLikeCount(commentId, delta),
+    return this.likeRepository.toggleComment(commentId, user.userId, (delta) =>
+      this.commentRepository.adjustLikeCount(commentId, delta),
     );
   }
 
@@ -66,10 +67,8 @@ export class LikesService {
       throw new NotFoundException('Reply not found');
     }
 
-    return this.likeRepository.toggleReply(
-      replyId,
-      user.userId,
-      (delta) => this.replyRepository.adjustLikeCount(replyId, delta),
+    return this.likeRepository.toggleReply(replyId, user.userId, (delta) =>
+      this.replyRepository.adjustLikeCount(replyId, delta),
     );
   }
 
@@ -78,17 +77,27 @@ export class LikesService {
     postId: string,
     cursor?: string,
     limit?: string,
-  ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
+  ): Promise<
+    CursorPaginatedResult<{
+      userId: string;
+      createdAt: Date;
+      author: { id: string; firstName: string; lastName: string };
+    }>
+  > {
     const post = await this.postRepository.findById(postId);
     if (!post) throw new NotFoundException('Post not found');
     if (!post.isPublic && post.userId !== user.userId) {
       throw new NotFoundException('Post not found');
     }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
-    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+    const parsedLimit = parseLimit(limit);
+    const parsedCursor = cursor ? decodeLikeCursor(cursor) : null;
 
-    const rows = await this.likeRepository.getPostLikers(postId, parsedCursor, parsedLimit);
+    const rows = await this.likeRepository.getPostLikers(
+      postId,
+      parsedCursor,
+      parsedLimit,
+    );
 
     return this.paginate(rows, parsedLimit);
   }
@@ -98,7 +107,13 @@ export class LikesService {
     commentId: string,
     cursor?: string,
     limit?: string,
-  ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
+  ): Promise<
+    CursorPaginatedResult<{
+      userId: string;
+      createdAt: Date;
+      author: { id: string; firstName: string; lastName: string };
+    }>
+  > {
     const comment = await this.commentRepository.findById(commentId);
     if (!comment) throw new NotFoundException('Comment not found');
 
@@ -107,10 +122,14 @@ export class LikesService {
       throw new NotFoundException('Comment not found');
     }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
-    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+    const parsedLimit = parseLimit(limit);
+    const parsedCursor = cursor ? decodeLikeCursor(cursor) : null;
 
-    const rows = await this.likeRepository.getCommentLikers(commentId, parsedCursor, parsedLimit);
+    const rows = await this.likeRepository.getCommentLikers(
+      commentId,
+      parsedCursor,
+      parsedLimit,
+    );
 
     return this.paginate(rows, parsedLimit);
   }
@@ -120,7 +139,13 @@ export class LikesService {
     replyId: string,
     cursor?: string,
     limit?: string,
-  ): Promise<CursorPaginatedResult<{ userId: string; createdAt: Date; author: { id: string; firstName: string; lastName: string } }>> {
+  ): Promise<
+    CursorPaginatedResult<{
+      userId: string;
+      createdAt: Date;
+      author: { id: string; firstName: string; lastName: string };
+    }>
+  > {
     const reply = await this.replyRepository.findById(replyId);
     if (!reply) throw new NotFoundException('Reply not found');
 
@@ -132,27 +157,26 @@ export class LikesService {
       throw new NotFoundException('Reply not found');
     }
 
-    const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 100);
-    const parsedCursor = cursor ? this.decodeCursor(cursor) : null;
+    const parsedLimit = parseLimit(limit);
+    const parsedCursor = cursor ? decodeLikeCursor(cursor) : null;
 
-    const rows = await this.likeRepository.getReplyLikers(replyId, parsedCursor, parsedLimit);
+    const rows = await this.likeRepository.getReplyLikers(
+      replyId,
+      parsedCursor,
+      parsedLimit,
+    );
 
     return this.paginate(rows, parsedLimit);
   }
 
-  private encodeCursor(value: { createdAt: Date; userId: string }): string {
-    return Buffer.from(
-      JSON.stringify({ createdAt: value.createdAt, userId: value.userId }),
-    ).toString('base64url');
-  }
-
-  private decodeCursor(cursor: string): { createdAt: Date; userId: string } {
-    const raw = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    return { createdAt: new Date(raw.createdAt), userId: raw.userId };
-  }
-
   private paginate(
-    rows: { userId: string; createdAt: Date; authorId: string; authorFirstName: string; authorLastName: string }[],
+    rows: {
+      userId: string;
+      createdAt: Date;
+      authorId: string;
+      authorFirstName: string;
+      authorLastName: string;
+    }[],
     limit: number,
   ) {
     const hasMore = rows.length > limit;
@@ -170,7 +194,7 @@ export class LikesService {
 
     return {
       items,
-      nextCursor: hasMore ? this.encodeCursor(rows[rows.length - 1]) : null,
+      nextCursor: hasMore ? encodeLikeCursor(rows[rows.length - 1]) : null,
       hasMore,
     };
   }
